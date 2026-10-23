@@ -61,7 +61,7 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
 
     private func loadDevCurl() {
         activityIndicator.startAnimating()
-        if let remoteUrl = URL(string: "http://192.168.18.200:8080") {
+        if let remoteUrl = URL(string: "http://192.168.18.200:8080/mobile") {
             let request = URLRequest(url: remoteUrl, timeoutInterval: 4.0)
             webView.load(request)
         } else {
