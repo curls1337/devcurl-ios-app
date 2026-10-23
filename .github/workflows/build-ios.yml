@@ -15,6 +15,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Select Xcode 16
+        run: |
+          for app in /Applications/Xcode_16*.app /Applications/Xcode_15*.app; do
+            if [ -d "$app" ]; then
+              sudo xcode-select -s "$app"
+              break
+            fi
+          done
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: |
           brew install xcodegen
