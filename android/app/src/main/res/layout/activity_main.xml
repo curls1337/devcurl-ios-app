@@ -1,11 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="#000000">
 
-    <WebView
-        android:id="@+id/webview"
+    <!-- Top App Bar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-</FrameLayout>
+        android:layout_height="?attr/actionBarSize"
+        android:background="#121214"
+        app:titleTextColor="#FFFFFF"
+        app:subtitleTextColor="#38BDF8"
+        app:title="DevCurl AI"
+        app:subtitle="🐧 Ubuntu Admin" />
+
+    <!-- Chat Stream RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical" />
+
+    <!-- Bottom Input Cluster -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#121214"
+        android:padding="10dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/inputMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@android:drawable/editbox_background_normal"
+            android:backgroundTint="#242834"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B"
+            android:hint="Kirim pesan ke Hermes..."
+            android:padding="12dp"
+            android:maxLines="4"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnSend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Kirim"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#007AFF" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="start"
+    android:layout_marginBottom="10dp">
+
+    <TextView
+        android:id="@+id/txtSender"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🐧 Ubuntu Admin"
+        android:textColor="#38BDF8"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:layout_marginStart="6dp"
+        android:layout_marginBottom="2dp" />
+
+    <TextView
+        android:id="@+id/txtContent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxWidth="300dp"
+        android:padding="12dp"
+        android:textColor="#F1F5F9"
+        android:textSize="14sp"
+        android:background="#1E293B" />
+</LinearLayout>
