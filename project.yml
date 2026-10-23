@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.devcurl.studio
   deploymentTarget:
     iOS: "14.0"
+  xcodeVersion: "15.0"
 targets:
   DevCurlAI:
     type: application
