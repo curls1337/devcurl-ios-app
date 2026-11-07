@@ -47,7 +47,7 @@ public class AppSettings {
     
     public var serverUrl: String {
         get {
-            return UserDefaults.standard.string(forKey: kServerUrl) ?? "http://192.168.18.200:8642/v1/chat/completions"
+            return UserDefaults.standard.string(forKey: kServerUrl) ?? "https://nik.5nod.com/v1/chat/completions"
         }
         set {
             UserDefaults.standard.set(newValue, forKey: kServerUrl)

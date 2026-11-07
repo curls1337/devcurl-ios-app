@@ -1,21 +1,29 @@
 import UIKit
+import AudioToolbox
+import AVFoundation
 
-public class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, VoiceCallDelegate {
+public class ViewController: UIViewController {
 
-    private var messages: [Message] = []
-    private var activeAgent: AgentProfile = AgentProfile.available[0]
-    private var isSending = false
-    private var isRecordingDictation = false
+    // UI Elements
+    private let topPillView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private let statusDot = UIView()
+    private let serverStatusLabel = UILabel()
+    private let settingsButton = UIButton(type: .system)
 
-    private let tableView = UITableView()
-    private let inputContainerView = UIView()
-    private let inputTextView = UITextView()
-    private let micButton = UIButton(type: .system)
-    private let sendButton = UIButton(type: .system)
-    private let placeholderLabel = UILabel()
-    private let typingIndicator = UIActivityIndicatorView(style: .medium)
+    private let orbContainerView = UIView()
+    private let haloLayer = CAGradientLayer()
+    private let rippleLayer = CAShapeLayer()
+    private let coreLayer = CAGradientLayer()
 
-    private var inputBottomConstraint: NSLayoutConstraint!
+    private let statusLabel = UILabel()
+    private let hintLabel = UILabel()
+
+    private let transcriptCard = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private let transcriptIcon = UIImageView(image: UIImage(systemName: "waveform"))
+    private let transcriptTextLabel = UILabel()
+
+    private var currentTranscript: String = ""
+    private var silenceTimer: Timer?
 
     public override var preferredStatusBarStyle: UIStatusBarStyle {
         return .lightContent
@@ -25,381 +33,344 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         super.viewDidLoad()
         view.backgroundColor = .black
 
-        setupNavigationBar()
-        setupTableView()
-        setupInputBar()
-        setupKeyboardObservers()
-
-        // Welcome Greeting
-        let initialGreeting = Message(
-            sender: "\(activeAgent.icon) \(activeAgent.name)",
-            content: "Halo Pak cURLdev! Saya \(activeAgent.name) (\(activeAgent.role)). Aplikasi native iOS ini terhubung ke Hermes dengan mode teks & Voice Call interaktif. Ada instruksi atau otomatisasi yang ingin dijalankan?",
-            isUser: false
-        )
-        messages.append(initialGreeting)
-        tableView.reloadData()
+        setupUI()
+        setupOrb()
+        setupVoiceCallbacks()
     }
 
-    // MARK: - Navigation Bar Setup
-    private func setupNavigationBar() {
-        navigationController?.navigationBar.barStyle = .black
-        navigationController?.navigationBar.tintColor = UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0)
-        navigationController?.navigationBar.isTranslucent = true
-
-        updateNavigationTitle()
-
-        // Left Bar Button: Agent Switcher
-        let agentButton = UIBarButtonItem(
-            title: "\(activeAgent.icon) Agen",
-            style: .plain,
-            target: self,
-            action: #selector(showAgentPicker)
-        )
-        navigationItem.leftBarButtonItem = agentButton
-
-        // Right Bar Buttons: Settings, New Chat, Voice Call
-        let voiceCallButton = UIBarButtonItem(
-            image: UIImage(systemName: "waveform.circle.fill"),
-            style: .plain,
-            target: self,
-            action: #selector(openVoiceCall)
-        )
-        voiceCallButton.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0)
-
-        let newChatButton = UIBarButtonItem(
-            image: UIImage(systemName: "square.and.pencil"),
-            style: .plain,
-            target: self,
-            action: #selector(startNewChat)
-        )
-
-        let settingsButton = UIBarButtonItem(
-            image: UIImage(systemName: "gearshape"),
-            style: .plain,
-            target: self,
-            action: #selector(openSettings)
-        )
-
-        navigationItem.rightBarButtonItems = [settingsButton, newChatButton, voiceCallButton]
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        requestPermissionsAndStart()
     }
 
-    private func updateNavigationTitle() {
-        let titleView = UIView()
-        let titleLabel = UILabel()
-        titleLabel.text = "DevCurl AI"
-        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-        titleLabel.textColor = .white
-        titleLabel.textAlignment = .center
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        silenceTimer?.invalidate()
+        VoiceManager.shared.stopListening()
+        VoiceManager.shared.stopSpeaking()
+    }
 
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = "\(activeAgent.icon) \(activeAgent.name)"
-        subtitleLabel.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
-        subtitleLabel.textColor = UIColor(red: 0.2, green: 0.8, blue: 0.9, alpha: 1.0)
-        subtitleLabel.textAlignment = .center
+    // MARK: - Setup UI
+    private func setupUI() {
+        // 1. Top Status Pill
+        topPillView.layer.cornerRadius = 18
+        topPillView.layer.masksToBounds = true
+        topPillView.layer.borderColor = UIColor(white: 0.25, alpha: 0.6).cgColor
+        topPillView.layer.borderWidth = 0.5
+        topPillView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(topPillView)
 
-        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 1
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        statusDot.backgroundColor = UIColor(red: 0.2, green: 0.85, blue: 0.4, alpha: 1.0)
+        statusDot.layer.cornerRadius = 4
+        statusDot.translatesAutoresizingMaskIntoConstraints = false
+        topPillView.contentView.addSubview(statusDot)
 
-        titleView.addSubview(stack)
+        serverStatusLabel.text = "nik.5nod.com  •  Nik AI"
+        serverStatusLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        serverStatusLabel.textColor = UIColor(white: 0.9, alpha: 1.0)
+        serverStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        topPillView.contentView.addSubview(serverStatusLabel)
+
+        // Settings Button
+        settingsButton.setImage(UIImage(systemName: "gearshape.fill"), for: .normal)
+        settingsButton.tintColor = UIColor(white: 0.5, alpha: 1.0)
+        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
+        view.addSubview(settingsButton)
+
+        // 2. Orb Container
+        orbContainerView.translatesAutoresizingMaskIntoConstraints = false
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleOrbTapped))
+        orbContainerView.addGestureRecognizer(tapGesture)
+        orbContainerView.isUserInteractionEnabled = true
+        view.addSubview(orbContainerView)
+
+        // 3. Status Labels
+        statusLabel.text = "Katakan \"Hai Nik\""
+        statusLabel.font = UIFont.systemFont(ofSize: 26, weight: .bold)
+        statusLabel.textColor = .white
+        statusLabel.textAlignment = .center
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(statusLabel)
+
+        hintLabel.text = "Atau sentuh bola untuk mulai bicara"
+        hintLabel.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+        hintLabel.textColor = UIColor(white: 0.5, alpha: 1.0)
+        hintLabel.textAlignment = .center
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(hintLabel)
+
+        // 4. Bottom Transcript Card
+        transcriptCard.layer.cornerRadius = 24
+        transcriptCard.layer.masksToBounds = true
+        transcriptCard.layer.borderColor = UIColor(white: 0.2, alpha: 0.5).cgColor
+        transcriptCard.layer.borderWidth = 0.5
+        transcriptCard.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(transcriptCard)
+
+        transcriptIcon.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.9, alpha: 1.0)
+        transcriptIcon.translatesAutoresizingMaskIntoConstraints = false
+        transcriptCard.contentView.addSubview(transcriptIcon)
+
+        transcriptTextLabel.text = "Siap mendengarkan instruksi..."
+        transcriptTextLabel.font = UIFont.systemFont(ofSize: 15, weight: .regular)
+        transcriptTextLabel.textColor = UIColor(white: 0.85, alpha: 1.0)
+        transcriptTextLabel.numberOfLines = 4
+        transcriptTextLabel.translatesAutoresizingMaskIntoConstraints = false
+        transcriptCard.contentView.addSubview(transcriptTextLabel)
+
+        // Layout Constraints
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: titleView.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: titleView.centerYAnchor)
-        ])
+            topPillView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
+            topPillView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            topPillView.heightAnchor.constraint(equalToConstant: 36),
 
-        navigationItem.titleView = stack
-    }
+            statusDot.leadingAnchor.constraint(equalTo: topPillView.contentView.leadingAnchor, constant: 14),
+            statusDot.centerYAnchor.constraint(equalTo: topPillView.contentView.centerYAnchor),
+            statusDot.widthAnchor.constraint(equalToConstant: 8),
+            statusDot.heightAnchor.constraint(equalToConstant: 8),
 
-    // MARK: - Table View Setup
-    private func setupTableView() {
-        tableView.backgroundColor = .black
-        tableView.separatorStyle = .none
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.register(MessageCell.self, forCellReuseIdentifier: MessageCell.identifier)
-        tableView.keyboardDismissMode = .interactive
-        tableView.translatesAutoresizingMaskIntoConstraints = false
+            serverStatusLabel.leadingAnchor.constraint(equalTo: statusDot.trailingAnchor, constant: 8),
+            serverStatusLabel.trailingAnchor.constraint(equalTo: topPillView.contentView.trailingAnchor, constant: -14),
+            serverStatusLabel.centerYAnchor.constraint(equalTo: topPillView.contentView.centerYAnchor),
 
-        view.addSubview(tableView)
-    }
+            settingsButton.centerYAnchor.constraint(equalTo: topPillView.centerYAnchor),
+            settingsButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            settingsButton.widthAnchor.constraint(equalToConstant: 36),
+            settingsButton.heightAnchor.constraint(equalToConstant: 36),
 
-    // MARK: - Input Bar Setup
-    private func setupInputBar() {
-        inputContainerView.backgroundColor = UIColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 0.95)
-        inputContainerView.layer.borderColor = UIColor(white: 0.2, alpha: 1.0).cgColor
-        inputContainerView.layer.borderWidth = 0.5
-        inputContainerView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(inputContainerView)
+            orbContainerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            orbContainerView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50),
+            orbContainerView.widthAnchor.constraint(equalToConstant: 240),
+            orbContainerView.heightAnchor.constraint(equalToConstant: 240),
 
-        // Mic Button (Dictation)
-        micButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
-        micButton.tintColor = UIColor(white: 0.7, alpha: 1.0)
-        micButton.translatesAutoresizingMaskIntoConstraints = false
-        micButton.addTarget(self, action: #selector(toggleDictation), for: .touchUpInside)
-        inputContainerView.addSubview(micButton)
+            statusLabel.topAnchor.constraint(equalTo: orbContainerView.bottomAnchor, constant: 36),
+            statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
 
-        // Text View
-        inputTextView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
-        inputTextView.textColor = .white
-        inputTextView.font = UIFont.systemFont(ofSize: 16)
-        inputTextView.layer.cornerRadius = 18
-        inputTextView.layer.masksToBounds = true
-        inputTextView.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
-        inputTextView.delegate = self
-        inputTextView.isScrollEnabled = false
-        inputTextView.translatesAutoresizingMaskIntoConstraints = false
-        inputContainerView.addSubview(inputTextView)
+            hintLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
+            hintLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            hintLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
 
-        // Placeholder
-        placeholderLabel.text = "Kirim pesan ke \(activeAgent.name)..."
-        placeholderLabel.textColor = UIColor(white: 0.5, alpha: 1.0)
-        placeholderLabel.font = UIFont.systemFont(ofSize: 16)
-        placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
-        inputTextView.addSubview(placeholderLabel)
+            transcriptCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            transcriptCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            transcriptCard.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            transcriptCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
 
-        // Send Button
-        sendButton.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
-        sendButton.tintColor = UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0)
-        sendButton.contentVerticalAlignment = .fill
-        sendButton.contentHorizontalAlignment = .fill
-        sendButton.translatesAutoresizingMaskIntoConstraints = false
-        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
-        inputContainerView.addSubview(sendButton)
+            transcriptIcon.leadingAnchor.constraint(equalTo: transcriptCard.contentView.leadingAnchor, constant: 16),
+            transcriptIcon.topAnchor.constraint(equalTo: transcriptCard.contentView.topAnchor, constant: 16),
+            transcriptIcon.widthAnchor.constraint(equalToConstant: 22),
+            transcriptIcon.heightAnchor.constraint(equalToConstant: 22),
 
-        // Typing Indicator
-        typingIndicator.color = UIColor(red: 0.2, green: 0.8, blue: 0.9, alpha: 1.0)
-        typingIndicator.hidesWhenStopped = true
-        typingIndicator.translatesAutoresizingMaskIntoConstraints = false
-        inputContainerView.addSubview(typingIndicator)
-
-        inputBottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
-
-        NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: inputContainerView.topAnchor),
-
-            inputContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            inputContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            inputBottomConstraint,
-
-            micButton.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor, constant: 10),
-            micButton.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
-            micButton.widthAnchor.constraint(equalToConstant: 32),
-            micButton.heightAnchor.constraint(equalToConstant: 32),
-
-            inputTextView.leadingAnchor.constraint(equalTo: micButton.trailingAnchor, constant: 8),
-            inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 8),
-            inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
-            inputTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
-
-            placeholderLabel.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
-            placeholderLabel.leadingAnchor.constraint(equalTo: inputTextView.leadingAnchor, constant: 14),
-
-            sendButton.leadingAnchor.constraint(equalTo: inputTextView.trailingAnchor, constant: 8),
-            sendButton.trailingAnchor.constraint(equalTo: inputContainerView.trailingAnchor, constant: -12),
-            sendButton.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
-            sendButton.widthAnchor.constraint(equalToConstant: 34),
-            sendButton.heightAnchor.constraint(equalToConstant: 34),
-
-            typingIndicator.centerXAnchor.constraint(equalTo: sendButton.centerXAnchor),
-            typingIndicator.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor)
+            transcriptTextLabel.leadingAnchor.constraint(equalTo: transcriptIcon.trailingAnchor, constant: 12),
+            transcriptTextLabel.trailingAnchor.constraint(equalTo: transcriptCard.contentView.trailingAnchor, constant: -16),
+            transcriptTextLabel.topAnchor.constraint(equalTo: transcriptCard.contentView.topAnchor, constant: 14),
+            transcriptTextLabel.bottomAnchor.constraint(equalTo: transcriptCard.contentView.bottomAnchor, constant: -14)
         ])
     }
 
-    // MARK: - Voice Call Action
-    @objc private func openVoiceCall() {
-        let generator = UIImpactFeedbackGenerator(style: .heavy)
-        generator.impactOccurred()
+    // MARK: - Modern Siri / Advanced Voice Orb
+    private func setupOrb() {
+        let bounds = CGRect(x: 0, y: 0, width: 240, height: 240)
 
-        let callVC = VoiceCallViewController()
-        callVC.activeAgent = self.activeAgent
-        callVC.delegate = self
-        callVC.modalPresentationStyle = .fullScreen
-        present(callVC, animated: true)
+        // Outer Halo Layer
+        haloLayer.frame = bounds
+        haloLayer.type = .radial
+        haloLayer.colors = [
+            UIColor(red: 0.1, green: 0.5, blue: 1.0, alpha: 0.35).cgColor,
+            UIColor.clear.cgColor
+        ]
+        haloLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+        haloLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+        orbContainerView.layer.addSublayer(haloLayer)
+
+        // Dynamic Ripple Layer
+        let circlePath = UIBezierPath(arcCenter: CGPoint(x: 120, y: 120), radius: 80, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+        rippleLayer.path = circlePath.cgPath
+        rippleLayer.fillColor = UIColor.clear.cgColor
+        rippleLayer.strokeColor = UIColor(red: 0.2, green: 0.8, blue: 0.9, alpha: 0.3).cgColor
+        rippleLayer.lineWidth = 2.0
+        orbContainerView.layer.addSublayer(rippleLayer)
+
+        // Core Liquid Sphere
+        coreLayer.frame = CGRect(x: 40, y: 40, width: 160, height: 160)
+        coreLayer.cornerRadius = 80
+        coreLayer.masksToBounds = true
+        coreLayer.colors = [
+            UIColor(red: 0.1, green: 0.8, blue: 0.9, alpha: 0.95).cgColor,
+            UIColor(red: 0.3, green: 0.2, blue: 0.9, alpha: 0.9).cgColor,
+            UIColor(red: 0.9, green: 0.2, blue: 0.6, alpha: 0.85).cgColor
+        ]
+        coreLayer.startPoint = CGPoint(x: 0.0, y: 0.0)
+        coreLayer.endPoint = CGPoint(x: 1.0, y: 1.0)
+        orbContainerView.layer.addSublayer(coreLayer)
+
+        startStandbyBreathing()
     }
 
-    public func voiceCallDidFinish(newMessages: [Message]) {
-        for msg in newMessages {
-            messages.append(msg)
+    private func startStandbyBreathing() {
+        coreLayer.removeAllAnimations()
+        let breath = CABasicAnimation(keyPath: "transform.scale")
+        breath.fromValue = 0.94
+        breath.toValue = 1.06
+        breath.duration = 2.8
+        breath.autoreverses = true
+        breath.repeatCount = .infinity
+        breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        coreLayer.add(breath, forKey: "breath")
+
+        let colorsAnim = CABasicAnimation(keyPath: "colors")
+        colorsAnim.toValue = [
+            UIColor(red: 0.2, green: 0.4, blue: 0.9, alpha: 0.9).cgColor,
+            UIColor(red: 0.1, green: 0.8, blue: 0.8, alpha: 0.9).cgColor,
+            UIColor(red: 0.7, green: 0.2, blue: 0.8, alpha: 0.8).cgColor
+        ]
+        colorsAnim.duration = 4.0
+        colorsAnim.autoreverses = true
+        colorsAnim.repeatCount = .infinity
+        colorsAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        coreLayer.add(colorsAnim, forKey: "colorsChange")
+    }
+
+    // MARK: - Voice Engine Callbacks
+    private func setupVoiceCallbacks() {
+        // Wake Word Detected ("Hai Nik")
+        VoiceManager.shared.onWakeWordDetected = { [weak self] in
+            guard let self = self else { return }
+            self.triggerWakeWordActive()
         }
-        tableView.reloadData()
-        scrollToBottom()
-    }
 
-    // MARK: - Dictation Toggle
-    @objc private func toggleDictation() {
-        if isRecordingDictation {
-            VoiceManager.shared.stopListening()
-            micButton.tintColor = UIColor(white: 0.7, alpha: 1.0)
-            isRecordingDictation = false
-        } else {
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-
-            VoiceManager.shared.requestPermissions { [weak self] granted in
-                guard let self = self else { return }
-                if granted {
-                    self.isRecordingDictation = true
-                    self.micButton.tintColor = .systemRed
-
-                    VoiceManager.shared.onTranscript = { [weak self] transcript, isFinal in
-                        guard let self = self else { return }
-                        self.inputTextView.text = transcript
-                        self.placeholderLabel.isHidden = !transcript.isEmpty
-                        if isFinal {
-                            self.toggleDictation()
-                        }
-                    }
-
-                    VoiceManager.shared.startListening()
-                } else {
-                    let alert = UIAlertController(title: "Izin Dibutuhkan", message: "Mohon aktifkan izin mikrofon & speech recognition di Pengaturan iOS.", preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    self.present(alert, animated: true)
+        // Live Audio Intensity (Ripples)
+        VoiceManager.shared.onAudioLevel = { [weak self] level in
+            guard let self = self else { return }
+            if VoiceManager.shared.currentState == .activeListening {
+                let scale = 1.0 + CGFloat(level) * 0.4
+                UIView.animate(withDuration: 0.08) {
+                    self.coreLayer.transform = CATransform3DMakeScale(scale, scale, 1.0)
                 }
             }
         }
+
+        // Live Transcript
+        VoiceManager.shared.onTranscript = { [weak self] transcript, isFinal in
+            guard let self = self else { return }
+            self.currentTranscript = transcript
+            self.transcriptTextLabel.text = "\"\(transcript)\""
+
+            // Reset silence timer (1.8s silence = end of user prompt)
+            self.silenceTimer?.invalidate()
+            self.silenceTimer = Timer.scheduledTimer(withTimeInterval: 1.8, repeats: false) { [weak self] _ in
+                self?.commitVoiceQuery()
+            }
+        }
+
+        // State Transition UI
+        VoiceManager.shared.onStateChange = { [weak self] state in
+            guard let self = self else { return }
+            self.updateUIForState(state)
+        }
+
+        VoiceManager.shared.onError = { [weak self] err in
+            guard let self = self else { return }
+            self.statusLabel.text = "⚠️ Periksa Izin Audio"
+            self.transcriptTextLabel.text = err
+        }
     }
 
-    // MARK: - Settings Action
-    @objc private func openSettings() {
-        let alert = UIAlertController(
-            title: "Pengaturan Koneksi Hermes",
-            message: "Konfigurasikan endpoint API server Hermes Anda:",
-            preferredStyle: .alert
-        )
+    private func updateUIForState(_ state: VoiceState) {
+        switch state {
+        case .standbyWakeWord:
+            statusLabel.text = "Katakan \"Hai Nik\""
+            hintLabel.text = "Atau sentuh bola untuk mulai bicara"
+            transcriptIcon.image = UIImage(systemName: "waveform")
+            transcriptIcon.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.9, alpha: 1.0)
+            startStandbyBreathing()
 
-        alert.addTextField { textField in
-            textField.placeholder = "URL Endpoint Server"
-            textField.text = AppSettings.shared.serverUrl
-            textField.autocapitalizationType = .none
-            textField.keyboardType = .URL
+        case .activeListening:
+            statusLabel.text = "🟢 Mendengarkan Anda..."
+            hintLabel.text = "Bicara sekarang, hening 1.8 detik untuk kirim"
+            transcriptIcon.image = UIImage(systemName: "mic.fill")
+            transcriptIcon.tintColor = UIColor(red: 0.2, green: 0.9, blue: 0.4, alpha: 1.0)
+
+        case .processing:
+            statusLabel.text = "🟡 Nik sedang memproses..."
+            hintLabel.text = "Menghubungkan ke Hermes Engine..."
+            transcriptIcon.image = UIImage(systemName: "cpu")
+            transcriptIcon.tintColor = UIColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0)
+
+            // Dynamic rotation animation while thinking
+            let rotate = CABasicAnimation(keyPath: "transform.rotation.z")
+            rotate.toValue = CGFloat.pi * 2
+            rotate.duration = 1.2
+            rotate.repeatCount = .infinity
+            coreLayer.add(rotate, forKey: "rotate")
+
+        case .speaking:
+            statusLabel.text = "🔵 Nik Berbicara..."
+            hintLabel.text = "Sentuh bola untuk menyela/berhenti"
+            transcriptIcon.image = UIImage(systemName: "speaker.wave.2.fill")
+            transcriptIcon.tintColor = UIColor(red: 0.0, green: 0.5, blue: 1.0, alpha: 1.0)
+
+            coreLayer.removeAllAnimations()
+            let pulse = CABasicAnimation(keyPath: "transform.scale")
+            pulse.fromValue = 0.98
+            pulse.toValue = 1.25
+            pulse.duration = 0.8
+            pulse.autoreverses = true
+            pulse.repeatCount = .infinity
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            coreLayer.add(pulse, forKey: "speakingPulse")
         }
-
-        alert.addTextField { textField in
-            textField.placeholder = "API Token (Kosongkan jika lokal)"
-            textField.text = AppSettings.shared.apiKey
-            textField.isSecureTextEntry = true
-        }
-
-        alert.addTextField { textField in
-            textField.placeholder = "Model ID (hermes-agent)"
-            textField.text = AppSettings.shared.model
-            textField.autocapitalizationType = .none
-        }
-
-        alert.addAction(UIAlertAction(title: "Simpan", style: .default) { _ in
-            if let newUrl = alert.textFields?[0].text?.trimmingCharacters(in: .whitespacesAndNewlines), !newUrl.isEmpty {
-                AppSettings.shared.serverUrl = newUrl
-            }
-            if let newKey = alert.textFields?[1].text?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                AppSettings.shared.apiKey = newKey
-            }
-            if let newModel = alert.textFields?[2].text?.trimmingCharacters(in: .whitespacesAndNewlines), !newModel.isEmpty {
-                AppSettings.shared.model = newModel
-            }
-
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-        })
-
-        alert.addAction(UIAlertAction(title: "Batal", style: .cancel))
-        present(alert, animated: true)
     }
 
-    // MARK: - Actions
-    @objc private func startNewChat() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
+    // MARK: - Actions & Triggers
+    @objc private func handleOrbTapped() {
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
 
-        messages.removeAll()
-        let greeting = Message(
-            sender: "\(activeAgent.icon) \(activeAgent.name)",
-            content: "Percakapan baru dimulai bersama \(activeAgent.name). Silakan ajukan pertanyaan atau berikan instruksi otomatisasi, Pak cURLdev!",
-            isUser: false
-        )
-        messages.append(greeting)
-        tableView.reloadData()
-    }
-
-    @objc private func showAgentPicker() {
-        let alert = UIAlertController(
-            title: "Pilih Agen Spesialis Hermes",
-            message: "Arahkan pembicaraan langsung ke salah satu divisi berikut:",
-            preferredStyle: .actionSheet
-        )
-
-        for agent in AgentProfile.available {
-            let action = UIAlertAction(title: "\(agent.icon) \(agent.name) — \(agent.role)", style: .default) { [weak self] _ in
-                guard let self = self else { return }
-                self.activeAgent = agent
-                self.navigationItem.leftBarButtonItem?.title = "\(agent.icon) Agen"
-                self.placeholderLabel.text = "Kirim pesan ke \(agent.name)..."
-                self.updateNavigationTitle()
-
-                let switchNotice = Message(
-                    sender: "👥 Sistem Multi-Agent",
-                    content: "Beralih ke \(agent.icon) \(agent.name) (\(agent.role)). Silakan mulai berdiskusi langsung.",
-                    isUser: false
-                )
-                self.messages.append(switchNotice)
-                self.tableView.reloadData()
-                self.scrollToBottom()
-            }
-            alert.addAction(action)
-        }
-
-        alert.addAction(UIAlertAction(title: "Batal", style: .cancel))
-        present(alert, animated: true)
-    }
-
-    @objc private func sendMessage() {
-        guard let text = inputTextView.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty, !isSending else {
+        if VoiceManager.shared.currentState == .speaking {
+            VoiceManager.shared.stopSpeaking()
+            VoiceManager.shared.startActiveListening()
             return
         }
 
-        if isRecordingDictation {
-            toggleDictation()
+        if VoiceManager.shared.currentState == .activeListening {
+            commitVoiceQuery()
+        } else {
+            triggerWakeWordActive()
+        }
+    }
+
+    private func triggerWakeWordActive() {
+        // Haptic feedback & subtle chime
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+        AudioServicesPlaySystemSound(1057) // Apple chime
+
+        currentTranscript = ""
+        transcriptTextLabel.text = "Mendengarkan suara Anda..."
+        VoiceManager.shared.startActiveListening()
+    }
+
+    private func commitVoiceQuery() {
+        silenceTimer?.invalidate()
+        let query = currentTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            VoiceManager.shared.startWakeWordStandby()
+            return
         }
 
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        VoiceManager.shared.setProcessing()
+        sendToHermes(userPrompt: query)
+    }
 
-        let userMessage = Message(sender: "Pak cURLdev", content: text, isUser: true)
-        messages.append(userMessage)
-        tableView.reloadData()
-        scrollToBottom()
-
-        inputTextView.text = ""
-        placeholderLabel.isHidden = false
-        sendButton.isHidden = true
-        typingIndicator.startAnimating()
-        isSending = true
-
+    private func sendToHermes(userPrompt: String) {
         let settings = AppSettings.shared
         guard let url = URL(string: settings.serverUrl) else {
-            showErrorResponse("URL Server di Pengaturan tidak valid.")
+            transcriptTextLabel.text = "URL Server tidak valid."
+            VoiceManager.shared.startWakeWordStandby()
             return
         }
-
-        // Standard OpenAI-compatible /v1/chat/completions payload
-        let payload: [String: Any] = [
-            "model": settings.model,
-            "messages": [
-                [
-                    "role": "system",
-                    "content": "Anda adalah \(activeAgent.name) (\(activeAgent.role)) dari ekosistem Hermes multi-agent. Tanggapi instruksi Pak cURLdev dengan profesional, ringkas, dan fokus pada eksekusi solusi teknis nyata."
-                ],
-                [
-                    "role": "user",
-                    "content": text
-                ]
-            ]
-        ]
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -409,127 +380,109 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         }
         request.timeoutInterval = 60.0
 
+        let systemInstruction = "Anda adalah Nik, AI Voice Assistant native pribadi Pak cURLdev berbasis Hermes Orchestrator. Berikan tanggapan dalam Bahasa Indonesia yang sangat alami, ramah, to-the-point, dan ringkas layaknya percakapan lisan langsung. Anda memiliki akses penuh ke server, WhatsApp, Telegram, video Remotion, dan semua otomatisasi."
+
+        let payload: [String: Any] = [
+            "model": settings.model,
+            "messages": [
+                ["role": "system", "content": systemInstruction],
+                ["role": "user", "content": userPrompt]
+            ]
+        ]
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         } catch {
-            showErrorResponse("Gagal serialisasi data JSON.")
+            VoiceManager.shared.startWakeWordStandby()
             return
         }
 
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                self.isSending = false
-                self.typingIndicator.stopAnimating()
-                self.sendButton.isHidden = false
 
                 if let error = error {
-                    self.showErrorResponse("Gagal terhubung ke Hermes: \(error.localizedDescription)\nPeriksa kembali URL Server di ikon Gerigi Pengaturan.")
+                    let errText = "Koneksi ke Nik server gagal: \(error.localizedDescription)"
+                    self.transcriptTextLabel.text = errText
+                    VoiceManager.shared.speak(text: "Maaf Pak cURLdev, koneksi ke server Hermes terganggu.")
                     return
                 }
 
                 guard let data = data else {
-                    self.showErrorResponse("Data kosong dari server.")
+                    VoiceManager.shared.startWakeWordStandby()
                     return
                 }
 
                 var replyText = ""
-
-                // 1. OpenAI Chat Completion format
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let choices = json["choices"] as? [[String: Any]],
                    let firstChoice = choices.first,
                    let messageObj = firstChoice["message"] as? [String: Any],
                    let content = messageObj["content"] as? String {
                     replyText = content
-                }
-                // 2. Custom "reply" key
-                else if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                        let directReply = json["reply"] as? String {
+                } else if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let directReply = json["reply"] as? String {
                     replyText = directReply
-                } else if let rawString = String(data: data, encoding: .utf8) {
-                    replyText = rawString
+                } else if let raw = String(data: data, encoding: .utf8) {
+                    replyText = raw
                 }
 
-                let cleanReply = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                let clean = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.transcriptTextLabel.text = clean
 
-                let receiveGenerator = UINotificationFeedbackGenerator()
-                receiveGenerator.notificationOccurred(.success)
+                // Haptic feedback for answer
+                let notif = UINotificationFeedbackGenerator()
+                notif.notificationOccurred(.success)
 
-                let agentMessage = Message(
-                    sender: "\(self.activeAgent.icon) \(self.activeAgent.name)",
-                    content: cleanReply,
-                    isUser: false
-                )
-                self.messages.append(agentMessage)
-                self.tableView.reloadData()
-                self.scrollToBottom()
-
-                if settings.autoVoice {
-                    VoiceManager.shared.speak(text: cleanReply)
-                }
+                // Speak reply back
+                VoiceManager.shared.speak(text: clean)
             }
         }.resume()
     }
 
-    private func showErrorResponse(_ errorText: String) {
-        isSending = false
-        typingIndicator.stopAnimating()
-        sendButton.isHidden = false
-
-        let errorMsg = Message(sender: "⚠️ System Error", content: errorText, isUser: false)
-        messages.append(errorMsg)
-        tableView.reloadData()
-        scrollToBottom()
-    }
-
-    private func scrollToBottom() {
-        guard !messages.isEmpty else { return }
-        let indexPath = IndexPath(row: messages.count - 1, section: 0)
-        tableView.scrollToRow(at: indexPath, at: .bottom, animated: true)
-    }
-
-    // MARK: - Text View Delegate
-    public func textViewDidChange(_ textView: UITextView) {
-        placeholderLabel.isHidden = !textView.text.isEmpty
-    }
-
-    // MARK: - Table View Data Source & Delegate
-    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return messages.count
-    }
-
-    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: MessageCell.identifier, for: indexPath) as! MessageCell
-        cell.configure(with: messages[indexPath.row])
-        return cell
-    }
-
-    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let msg = messages[indexPath.row]
-        VoiceManager.shared.speak(text: msg.content)
-    }
-
-    // MARK: - Keyboard Handling
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
-    }
-
-    @objc private func keyboardWillShow(notification: NSNotification) {
-        if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-            inputBottomConstraint.constant = -keyboardFrame.height + view.safeAreaInsets.bottom
-            UIView.animate(withDuration: 0.3) {
-                self.view.layoutIfNeeded()
+    private func requestPermissionsAndStart() {
+        VoiceManager.shared.requestPermissions { [weak self] granted in
+            guard let self = self else { return }
+            if granted {
+                self.transcriptTextLabel.text = "Siap. Katakan \"Hai Nik\" kapan saja..."
+                VoiceManager.shared.startWakeWordStandby()
+            } else {
+                self.transcriptTextLabel.text = "Izin mikrofon belum aktif. Buka Pengaturan iOS."
             }
-            scrollToBottom()
         }
     }
 
-    @objc private func keyboardWillHide(notification: NSNotification) {
-        inputBottomConstraint.constant = 0
-        UIView.animate(withDuration: 0.3) {
-            self.view.layoutIfNeeded()
+    // MARK: - Settings Action
+    @objc private func openSettings() {
+        let alert = UIAlertController(
+            title: "Pengaturan Server Nik AI",
+            message: "Endpoint saat ini: https://nik.5nod.com",
+            preferredStyle: .alert
+        )
+
+        alert.addTextField { tf in
+            tf.placeholder = "URL Endpoint Server"
+            tf.text = AppSettings.shared.serverUrl
+            tf.autocapitalizationType = .none
+            tf.keyboardType = .URL
         }
+
+        alert.addTextField { tf in
+            tf.placeholder = "API Token"
+            tf.text = AppSettings.shared.apiKey
+            tf.isSecureTextEntry = true
+        }
+
+        alert.addAction(UIAlertAction(title: "Simpan", style: .default) { _ in
+            if let u = alert.textFields?[0].text?.trimmingCharacters(in: .whitespacesAndNewlines), !u.isEmpty {
+                AppSettings.shared.serverUrl = u
+            }
+            if let k = alert.textFields?[1].text?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                AppSettings.shared.apiKey = k
+            }
+        })
+
+        alert.addAction(UIAlertAction(title: "Batal", style: .cancel))
+        present(alert, animated: true)
     }
 }
