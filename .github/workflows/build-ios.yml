@@ -37,8 +37,8 @@ jobs:
       - name: Build iOS Application (Release)
         run: |
           xcodebuild clean build \
-            -project DevCurlAI.xcodeproj \
-            -scheme DevCurlAI \
+            -project NikAI.xcodeproj \
+            -scheme NikAI \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
@@ -50,14 +50,15 @@ jobs:
       - name: Package into Sideloadable IPA
         run: |
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/DevCurlAI.app Payload/
-          zip -r DevCurlAI.ipa Payload
+          cp -r build/Build/Products/Release-iphoneos/NikAI.app Payload/
+          zip -r NikAI.ipa Payload
+          cp NikAI.ipa DevCurlAI.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DevCurlAI-iOS-IPA
-          path: DevCurlAI.ipa
+          name: NikAI-iOS-IPA
+          path: NikAI.ipa
           retention-days: 30
 
   build-android:
@@ -104,7 +105,7 @@ jobs:
       - name: Download iOS IPA
         uses: actions/download-artifact@v4
         with:
-          name: DevCurlAI-iOS-IPA
+          name: NikAI-iOS-IPA
           path: ./artifacts-ios
 
       - name: Download Android APK
@@ -115,22 +116,22 @@ jobs:
 
       - name: Consolidate Binaries
         run: |
-          cp ./artifacts-ios/DevCurlAI.ipa ./DevCurlAI.ipa
+          cp ./artifacts-ios/NikAI.ipa ./NikAI.ipa
           cp ./artifacts-android/DevCurlAI.apk ./DevCurlAI.apk
-          ls -lh DevCurlAI.ipa DevCurlAI.apk
+          ls -lh NikAI.ipa DevCurlAI.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.${{ github.run_number }}
-          name: Nik AI v2.0.${{ github.run_number }} (Pure Voice Assistant, 'Hai Nik' Wake Word & nik.5nod.com)
+          tag_name: v2.5.${{ github.run_number }}
+          name: Nik AI v2.5.${{ github.run_number }} (Pure Voice Assistant, 'Hai Nik' & nik.5nod.com)
           body: |
-            ## Nik AI v2.0 — Pure Native Voice Assistant (iOS & Android)
+            ## Nik AI v2.5 — Pure Native Voice Assistant (iOS & Android)
             Aplikasi suara murni native resmi untuk Pak cURLdev:
-            - **`DevCurlAI.ipa`**: iOS Sideload (ESign, Scarlet, AltStore, Sideloadly)
+            - **`NikAI.ipa`**: iOS Sideload (ESign, Scarlet, AltStore, Sideloadly)
             - **`DevCurlAI.apk`**: Android Direct Install
             
-            ### Fitur Utama v2.0:
+            ### Fitur Utama v2.5:
             - 🎙️ **Pure Voice UI/UX**: Zero chat bloat. Dynamic OLED Neural Orb dengan visualisasi suara real-time.
             - 🗣️ **Wake Word ("Hai Nik")**: Panggil "Hai Nik" atau sentuh bola untuk mulai mendengarkan secara otomatis.
             - 🌐 **Direct Cloudflare Domain**: Langsung terhubung ke `https://nik.5nod.com` (Hermes API Gateway).
@@ -138,7 +139,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            DevCurlAI.ipa
+            NikAI.ipa
             DevCurlAI.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

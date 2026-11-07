@@ -1,11 +1,11 @@
-name: DevCurlAI
+name: NikAI
 options:
-  bundleIdPrefix: com.devcurl.studio
+  bundleIdPrefix: com.nik.voice
   deploymentTarget:
     iOS: "15.0"
   xcodeVersion: "15.0"
 targets:
-  DevCurlAI:
+  NikAI:
     type: application
     platform: iOS
     deploymentTarget: "15.0"
@@ -15,10 +15,10 @@ targets:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.devcurl.studio.mobile
+      PRODUCT_BUNDLE_IDENTIFIER: com.nik.voice.ai
       INFOPLIST_FILE: DevCurlAI/Info.plist
-      MARKETING_VERSION: "2.1.0"
-      CURRENT_PROJECT_VERSION: "4"
+      MARKETING_VERSION: "2.5.0"
+      CURRENT_PROJECT_VERSION: "5"
       SWIFT_VERSION: "5.0"
       CODE_SIGNING_ALLOWED: "NO"
       CODE_SIGNING_REQUIRED: "NO"
