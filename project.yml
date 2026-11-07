@@ -2,20 +2,23 @@ name: DevCurlAI
 options:
   bundleIdPrefix: com.devcurl.studio
   deploymentTarget:
-    iOS: "14.0"
+    iOS: "15.0"
   xcodeVersion: "15.0"
 targets:
   DevCurlAI:
     type: application
     platform: iOS
-    deploymentTarget: "14.0"
+    deploymentTarget: "15.0"
     sources:
       - path: DevCurlAI
+    dependencies:
+      - sdk: AVFoundation.framework
+      - sdk: Speech.framework
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.devcurl.studio.mobile
       INFOPLIST_FILE: DevCurlAI/Info.plist
-      MARKETING_VERSION: "1.0.0"
-      CURRENT_PROJECT_VERSION: "1"
+      MARKETING_VERSION: "1.2.0"
+      CURRENT_PROJECT_VERSION: "2"
       SWIFT_VERSION: "5.0"
       CODE_SIGNING_ALLOWED: "NO"
       CODE_SIGNING_REQUIRED: "NO"

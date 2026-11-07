@@ -59,6 +59,8 @@
         <true/>
     </dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>DevCurl AI memerlukan akses mikrofon untuk komunikasi suara multi-agent.</string>
+    <string>DevCurl AI memerlukan akses mikrofon untuk komunikasi suara multi-agent dan voice call interaktif.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>DevCurl AI memerlukan izin speech recognition untuk mendengarkan percakapan suara Anda.</string>
 </dict>
 </plist>

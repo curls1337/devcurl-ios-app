@@ -23,7 +23,10 @@ public struct AgentProfile {
     public let icon: String
 
     public static let available: [AgentProfile] = [
+        AgentProfile(id: "hermes-agent", name: "Hermes Orchestrator", role: "Sutradara & Automation Controller", icon: "🧠"),
         AgentProfile(id: "ubuntu-admin", name: "Ubuntu Admin", role: "Root & Server Controller", icon: "🐧"),
+        AgentProfile(id: "video-producer", name: "Video Producer", role: "Naskah & Hook Video Remotion", icon: "🎬"),
+        AgentProfile(id: "marketing-strategist", name: "Marketing Strategist", role: "Strategi Konten & Viralitas", icon: "📈"),
         AgentProfile(id: "product-manager", name: "Product Manager", role: "PRD & Backlog MVP", icon: "📦"),
         AgentProfile(id: "ui-ux-designer", name: "UI/UX Designer", role: "Liquid Glass & Ergonomi", icon: "🎨"),
         AgentProfile(id: "frontend-developer", name: "Frontend Developer", role: "Swift iOS & React", icon: "💻"),
@@ -32,4 +35,52 @@ public struct AgentProfile {
         AgentProfile(id: "qa-security", name: "QA & Security", role: "Testing & OWASP Audit", icon: "🛡️"),
         AgentProfile(id: "all", name: "Semua Agen", role: "Roundtable Collaboration", icon: "👥")
     ]
+}
+
+public class AppSettings {
+    public static let shared = AppSettings()
+    
+    private let kServerUrl = "devcurl_server_url"
+    private let kApiKey = "devcurl_api_key"
+    private let kModel = "devcurl_model"
+    private let kAutoVoice = "devcurl_auto_voice"
+    
+    public var serverUrl: String {
+        get {
+            return UserDefaults.standard.string(forKey: kServerUrl) ?? "http://192.168.18.200:8642/v1/chat/completions"
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: kServerUrl)
+        }
+    }
+    
+    public var apiKey: String {
+        get {
+            return UserDefaults.standard.string(forKey: kApiKey) ?? "f86a19673527f4925d94012214514f34d0b86b33553052793c141279fd87effa"
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: kApiKey)
+        }
+    }
+    
+    public var model: String {
+        get {
+            return UserDefaults.standard.string(forKey: kModel) ?? "hermes-agent"
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: kModel)
+        }
+    }
+    
+    public var autoVoice: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: kAutoVoice) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: kAutoVoice)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: kAutoVoice)
+        }
+    }
 }

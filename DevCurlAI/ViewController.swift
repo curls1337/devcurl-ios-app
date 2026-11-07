@@ -1,20 +1,21 @@
 import UIKit
 
-public class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate {
+public class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, VoiceCallDelegate {
 
     private var messages: [Message] = []
-    private var activeAgent: AgentProfile = AgentProfile.available[0] // Default: Ubuntu Admin
+    private var activeAgent: AgentProfile = AgentProfile.available[0]
     private var isSending = false
+    private var isRecordingDictation = false
 
     private let tableView = UITableView()
     private let inputContainerView = UIView()
     private let inputTextView = UITextView()
+    private let micButton = UIButton(type: .system)
     private let sendButton = UIButton(type: .system)
     private let placeholderLabel = UILabel()
     private let typingIndicator = UIActivityIndicatorView(style: .medium)
 
     private var inputBottomConstraint: NSLayoutConstraint!
-    private let serverUrl = URL(string: "http://192.168.18.200:8080/api/projects/discovery/chat")!
 
     public override var preferredStatusBarStyle: UIStatusBarStyle {
         return .lightContent
@@ -32,7 +33,7 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         // Welcome Greeting
         let initialGreeting = Message(
             sender: "\(activeAgent.icon) \(activeAgent.name)",
-            content: "Halo Pak cURLdev! Saya \(activeAgent.name) (\(activeAgent.role)). Aplikasi native iOS ini berjalan 100% native Swift tanpa webview. Ada instruksi atau ide yang ingin didiskusikan?",
+            content: "Halo Pak cURLdev! Saya \(activeAgent.name) (\(activeAgent.role)). Aplikasi native iOS ini terhubung ke Hermes dengan mode teks & Voice Call interaktif. Ada instruksi atau otomatisasi yang ingin dijalankan?",
             isUser: false
         )
         messages.append(initialGreeting)
@@ -56,14 +57,30 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         )
         navigationItem.leftBarButtonItem = agentButton
 
-        // Right Bar Button: New Chat
+        // Right Bar Buttons: Settings, New Chat, Voice Call
+        let voiceCallButton = UIBarButtonItem(
+            image: UIImage(systemName: "waveform.circle.fill"),
+            style: .plain,
+            target: self,
+            action: #selector(openVoiceCall)
+        )
+        voiceCallButton.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0)
+
         let newChatButton = UIBarButtonItem(
             image: UIImage(systemName: "square.and.pencil"),
             style: .plain,
             target: self,
             action: #selector(startNewChat)
         )
-        navigationItem.rightBarButtonItem = newChatButton
+
+        let settingsButton = UIBarButtonItem(
+            image: UIImage(systemName: "gearshape"),
+            style: .plain,
+            target: self,
+            action: #selector(openSettings)
+        )
+
+        navigationItem.rightBarButtonItems = [settingsButton, newChatButton, voiceCallButton]
     }
 
     private func updateNavigationTitle() {
@@ -116,6 +133,13 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         inputContainerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(inputContainerView)
 
+        // Mic Button (Dictation)
+        micButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
+        micButton.tintColor = UIColor(white: 0.7, alpha: 1.0)
+        micButton.translatesAutoresizingMaskIntoConstraints = false
+        micButton.addTarget(self, action: #selector(toggleDictation), for: .touchUpInside)
+        inputContainerView.addSubview(micButton)
+
         // Text View
         inputTextView.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
         inputTextView.textColor = .white
@@ -162,7 +186,12 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
             inputContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             inputBottomConstraint,
 
-            inputTextView.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor, constant: 12),
+            micButton.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor, constant: 10),
+            micButton.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
+            micButton.widthAnchor.constraint(equalToConstant: 32),
+            micButton.heightAnchor.constraint(equalToConstant: 32),
+
+            inputTextView.leadingAnchor.constraint(equalTo: micButton.trailingAnchor, constant: 8),
             inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 8),
             inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
             inputTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
@@ -181,6 +210,107 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         ])
     }
 
+    // MARK: - Voice Call Action
+    @objc private func openVoiceCall() {
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+
+        let callVC = VoiceCallViewController()
+        callVC.activeAgent = self.activeAgent
+        callVC.delegate = self
+        callVC.modalPresentationStyle = .fullScreen
+        present(callVC, animated: true)
+    }
+
+    public func voiceCallDidFinish(newMessages: [Message]) {
+        for msg in newMessages {
+            messages.append(msg)
+        }
+        tableView.reloadData()
+        scrollToBottom()
+    }
+
+    // MARK: - Dictation Toggle
+    @objc private func toggleDictation() {
+        if isRecordingDictation {
+            VoiceManager.shared.stopListening()
+            micButton.tintColor = UIColor(white: 0.7, alpha: 1.0)
+            isRecordingDictation = false
+        } else {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+
+            VoiceManager.shared.requestPermissions { [weak self] granted in
+                guard let self = self else { return }
+                if granted {
+                    self.isRecordingDictation = true
+                    self.micButton.tintColor = .systemRed
+
+                    VoiceManager.shared.onTranscript = { [weak self] transcript, isFinal in
+                        guard let self = self else { return }
+                        self.inputTextView.text = transcript
+                        self.placeholderLabel.isHidden = !transcript.isEmpty
+                        if isFinal {
+                            self.toggleDictation()
+                        }
+                    }
+
+                    VoiceManager.shared.startListening()
+                } else {
+                    let alert = UIAlertController(title: "Izin Dibutuhkan", message: "Mohon aktifkan izin mikrofon & speech recognition di Pengaturan iOS.", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
+    }
+
+    // MARK: - Settings Action
+    @objc private func openSettings() {
+        let alert = UIAlertController(
+            title: "Pengaturan Koneksi Hermes",
+            message: "Konfigurasikan endpoint API server Hermes Anda:",
+            preferredStyle: .alert
+        )
+
+        alert.addTextField { textField in
+            textField.placeholder = "URL Endpoint Server"
+            textField.text = AppSettings.shared.serverUrl
+            textField.autocapitalizationType = .none
+            textField.keyboardType = .URL
+        }
+
+        alert.addTextField { textField in
+            textField.placeholder = "API Token (Kosongkan jika lokal)"
+            textField.text = AppSettings.shared.apiKey
+            textField.isSecureTextEntry = true
+        }
+
+        alert.addTextField { textField in
+            textField.placeholder = "Model ID (hermes-agent)"
+            textField.text = AppSettings.shared.model
+            textField.autocapitalizationType = .none
+        }
+
+        alert.addAction(UIAlertAction(title: "Simpan", style: .default) { _ in
+            if let newUrl = alert.textFields?[0].text?.trimmingCharacters(in: .whitespacesAndNewlines), !newUrl.isEmpty {
+                AppSettings.shared.serverUrl = newUrl
+            }
+            if let newKey = alert.textFields?[1].text?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                AppSettings.shared.apiKey = newKey
+            }
+            if let newModel = alert.textFields?[2].text?.trimmingCharacters(in: .whitespacesAndNewlines), !newModel.isEmpty {
+                AppSettings.shared.model = newModel
+            }
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        })
+
+        alert.addAction(UIAlertAction(title: "Batal", style: .cancel))
+        present(alert, animated: true)
+    }
+
     // MARK: - Actions
     @objc private func startNewChat() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -189,7 +319,7 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         messages.removeAll()
         let greeting = Message(
             sender: "\(activeAgent.icon) \(activeAgent.name)",
-            content: "Percakapan baru dimulai bersama \(activeAgent.name). Silakan ajukan pertanyaan atau berikan instruksi teknis, Pak cURLdev!",
+            content: "Percakapan baru dimulai bersama \(activeAgent.name). Silakan ajukan pertanyaan atau berikan instruksi otomatisasi, Pak cURLdev!",
             isUser: false
         )
         messages.append(greeting)
@@ -232,6 +362,10 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
             return
         }
 
+        if isRecordingDictation {
+            toggleDictation()
+        }
+
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
 
@@ -246,17 +380,34 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         typingIndicator.startAnimating()
         isSending = true
 
-        // Prepare JSON payload
+        let settings = AppSettings.shared
+        guard let url = URL(string: settings.serverUrl) else {
+            showErrorResponse("URL Server di Pengaturan tidak valid.")
+            return
+        }
+
+        // Standard OpenAI-compatible /v1/chat/completions payload
         let payload: [String: Any] = [
-            "messages": messages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.content] },
-            "active_agent": activeAgent.id,
-            "speaker": "Pak cURLdev"
+            "model": settings.model,
+            "messages": [
+                [
+                    "role": "system",
+                    "content": "Anda adalah \(activeAgent.name) (\(activeAgent.role)) dari ekosistem Hermes multi-agent. Tanggapi instruksi Pak cURLdev dengan profesional, ringkas, dan fokus pada eksekusi solusi teknis nyata."
+                ],
+                [
+                    "role": "user",
+                    "content": text
+                ]
+            ]
         ]
 
-        var request = URLRequest(url: serverUrl)
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 25.0
+        if !settings.apiKey.isEmpty {
+            request.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        request.timeoutInterval = 60.0
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -273,33 +424,59 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
                 self.sendButton.isHidden = false
 
                 if let error = error {
-                    self.showErrorResponse("Gagal terhubung ke server lokal (192.168.18.200): \(error.localizedDescription)")
+                    self.showErrorResponse("Gagal terhubung ke Hermes: \(error.localizedDescription)\nPeriksa kembali URL Server di ikon Gerigi Pengaturan.")
                     return
                 }
 
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let reply = json["reply"] as? String else {
-                    self.showErrorResponse("Format respon server tidak dikenali.")
+                guard let data = data else {
+                    self.showErrorResponse("Data kosong dari server.")
                     return
                 }
+
+                var replyText = ""
+
+                // 1. OpenAI Chat Completion format
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let choices = json["choices"] as? [[String: Any]],
+                   let firstChoice = choices.first,
+                   let messageObj = firstChoice["message"] as? [String: Any],
+                   let content = messageObj["content"] as? String {
+                    replyText = content
+                }
+                // 2. Custom "reply" key
+                else if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        let directReply = json["reply"] as? String {
+                    replyText = directReply
+                } else if let rawString = String(data: data, encoding: .utf8) {
+                    replyText = rawString
+                }
+
+                let cleanReply = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
 
                 let receiveGenerator = UINotificationFeedbackGenerator()
                 receiveGenerator.notificationOccurred(.success)
 
                 let agentMessage = Message(
                     sender: "\(self.activeAgent.icon) \(self.activeAgent.name)",
-                    content: reply,
+                    content: cleanReply,
                     isUser: false
                 )
                 self.messages.append(agentMessage)
                 self.tableView.reloadData()
                 self.scrollToBottom()
+
+                if settings.autoVoice {
+                    VoiceManager.shared.speak(text: cleanReply)
+                }
             }
         }.resume()
     }
 
     private func showErrorResponse(_ errorText: String) {
+        isSending = false
+        typingIndicator.stopAnimating()
+        sendButton.isHidden = false
+
         let errorMsg = Message(sender: "⚠️ System Error", content: errorText, isUser: false)
         messages.append(errorMsg)
         tableView.reloadData()
@@ -317,7 +494,7 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         placeholderLabel.isHidden = !textView.text.isEmpty
     }
 
-    // MARK: - Table View Data Source
+    // MARK: - Table View Data Source & Delegate
     public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return messages.count
     }
@@ -326,6 +503,11 @@ public class ViewController: UIViewController, UITableViewDataSource, UITableVie
         let cell = tableView.dequeueReusableCell(withIdentifier: MessageCell.identifier, for: indexPath) as! MessageCell
         cell.configure(with: messages[indexPath.row])
         return cell
+    }
+
+    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let msg = messages[indexPath.row]
+        VoiceManager.shared.speak(text: msg.content)
     }
 
     // MARK: - Keyboard Handling

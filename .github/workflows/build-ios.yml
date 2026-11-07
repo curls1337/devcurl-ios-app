@@ -122,18 +122,19 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.${{ github.run_number }}
-          name: DevCurl AI Mobile Suite v1.1.${{ github.run_number }} (iOS & Android)
+          tag_name: v1.2.${{ github.run_number }}
+          name: DevCurl AI Mobile Suite v1.2.${{ github.run_number }} (iOS Voice Mode & Automation)
           body: |
-            ## DevCurl AI — Professional Mobile Client (iOS & Android)
+            ## DevCurl AI — Professional Native iOS & Android Client
             Aplikasi mobile native resmi untuk Pak cURLdev:
             - **`DevCurlAI.ipa`**: iOS Sideload (ESign, Sideloadly, AltStore, Scarlet)
             - **`DevCurlAI.apk`**: Android Direct Install
             
-            ### Fitur
-            - Desain mobile profesional khusus (Apple HIG & Dark OLED)
-            - Percakapan multi-turn & New Chat
-            - Multi-Agent Switcher (Ubuntu Admin, PM, UI/UX, Frontend, Backend)
+            ### Fitur Baru v1.2:
+            - 🎙️ **Full Interactive Voice Call Mode**: Ngobrol suara interaktif dua arah real-time seperti menelepon manusia (Apple SFSpeechRecognizer & AVSpeechSynthesizer).
+            - 🗣️ **Direct Voice Dictation**: Dikte suara langsung ke kolom pesan via tombol mic.
+            - ⚙️ **In-App Server Settings**: Konfigurasi URL server Hermes dan API token langsung di aplikasi.
+            - 🤖 **Hermes Multi-Agent Orchestrator**: Terhubung langsung ke API Hermes untuk eksekusi tugas server, chat WhatsApp, otomasi, dan video Remotion.
           draft: false
           prerelease: false
           files: |
