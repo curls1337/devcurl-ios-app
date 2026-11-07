@@ -14,11 +14,13 @@ targets:
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
+      - sdk: CoreLocation.framework
+      - sdk: Contacts.framework
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.nik.voice.ai
       INFOPLIST_FILE: DevCurlAI/Info.plist
-      MARKETING_VERSION: "2.5.0"
-      CURRENT_PROJECT_VERSION: "5"
+      MARKETING_VERSION: "2.6.0"
+      CURRENT_PROJECT_VERSION: "6"
       SWIFT_VERSION: "5.0"
       CODE_SIGNING_ALLOWED: "NO"
       CODE_SIGNING_REQUIRED: "NO"

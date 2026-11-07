@@ -380,7 +380,12 @@ public class ViewController: UIViewController {
         }
         request.timeoutInterval = 60.0
 
-        let systemInstruction = "Anda adalah Nik, AI Voice Assistant native pribadi Pak cURLdev berbasis Hermes Orchestrator. Berikan tanggapan dalam Bahasa Indonesia yang sangat alami, ramah, to-the-point, dan ringkas layaknya percakapan lisan langsung. Anda memiliki akses penuh ke server, WhatsApp, Telegram, video Remotion, dan semua otomatisasi."
+        let deviceContext = DeviceContextManager.shared.getDeviceContextSummary()
+        let systemInstruction = """
+        Anda adalah Nik, AI Voice Assistant native pribadi Pak cURLdev berbasis Hermes Orchestrator. Berikan tanggapan dalam Bahasa Indonesia yang sangat alami, ramah, to-the-point, dan ringkas layaknya percakapan lisan langsung. Anda memiliki akses penuh ke server, WhatsApp, Telegram, video Remotion, dan semua otomatisasi.
+
+        \(deviceContext)
+        """
 
         let payload: [String: Any] = [
             "model": settings.model,
@@ -441,6 +446,7 @@ public class ViewController: UIViewController {
     }
 
     private func requestPermissionsAndStart() {
+        DeviceContextManager.shared.requestPermissions()
         VoiceManager.shared.requestPermissions { [weak self] granted in
             guard let self = self else { return }
             if granted {

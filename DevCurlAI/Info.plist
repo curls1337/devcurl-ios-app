@@ -25,6 +25,7 @@
     <key>UIBackgroundModes</key>
     <array>
         <string>audio</string>
+        <string>location</string>
     </array>
     <key>UIApplicationSceneManifest</key>
     <dict>
@@ -63,8 +64,18 @@
         <true/>
     </dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>DevCurl AI memerlukan akses mikrofon untuk komunikasi suara multi-agent dan voice call interaktif.</string>
+    <string>Nik AI memerlukan akses mikrofon untuk mendengarkan percakapan dan instruksi suara Anda.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>DevCurl AI memerlukan izin speech recognition untuk mendengarkan percakapan suara Anda.</string>
+    <string>Nik AI memerlukan izin speech recognition untuk mengenali ucapan dan perintah suara Anda secara akurat.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Nik AI memerlukan izin lokasi GPS untuk memberikan informasi cuaca, rekomendasi rute, dan automasi berbasis lokasi saat aplikasi digunakan.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Nik AI memerlukan izin lokasi penuh untuk automasi cerdas berbasis geofencing dan lokasi terkini.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Nik AI memerlukan izin kontak agar Anda dapat memerintahkan pengiriman pesan WhatsApp atau panggilan ke nama kontak Anda.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Nik AI memerlukan akses kamera untuk menganalisis objek visual atau dokumen yang Anda tanyakan.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Nik AI memerlukan akses galeri foto untuk membaca atau memproses gambar yang Anda pilih.</string>
 </dict>
 </plist>
