@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final String SERVER_API = "http://192.168.18.200:8080/api/projects/discovery/chat";
+    private final String SERVER_API = "https://nik.5nod.com/v1/chat/completions";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

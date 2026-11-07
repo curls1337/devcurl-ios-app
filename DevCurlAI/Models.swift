@@ -40,14 +40,18 @@ public struct AgentProfile {
 public class AppSettings {
     public static let shared = AppSettings()
     
-    private let kServerUrl = "devcurl_server_url"
-    private let kApiKey = "devcurl_api_key"
-    private let kModel = "devcurl_model"
-    private let kAutoVoice = "devcurl_auto_voice"
+    private let kServerUrl = "nik_ai_server_url_v2"
+    private let kApiKey = "nik_ai_api_key_v2"
+    private let kModel = "nik_ai_model_v2"
+    private let kAutoVoice = "nik_ai_auto_voice_v2"
     
     public var serverUrl: String {
         get {
-            return UserDefaults.standard.string(forKey: kServerUrl) ?? "https://nik.5nod.com/v1/chat/completions"
+            let saved = UserDefaults.standard.string(forKey: kServerUrl)
+            if let saved = saved, !saved.contains("192.168") && !saved.contains("8080") && !saved.isEmpty {
+                return saved
+            }
+            return "https://nik.5nod.com/v1/chat/completions"
         }
         set {
             UserDefaults.standard.set(newValue, forKey: kServerUrl)

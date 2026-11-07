@@ -17,8 +17,8 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.devcurl.studio.mobile
       INFOPLIST_FILE: DevCurlAI/Info.plist
-      MARKETING_VERSION: "2.0.0"
-      CURRENT_PROJECT_VERSION: "3"
+      MARKETING_VERSION: "2.1.0"
+      CURRENT_PROJECT_VERSION: "4"
       SWIFT_VERSION: "5.0"
       CODE_SIGNING_ALLOWED: "NO"
       CODE_SIGNING_REQUIRED: "NO"
